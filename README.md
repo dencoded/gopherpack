@@ -64,7 +64,7 @@ func main() {
 		Handler: mux, // this can be any http.Handler, func ur mux with complex routing
 	}
 
-    // start listener as part of worker process
+	// start listener as part of worker process
 	// "tcp" and "unix" are the networks supported
 	log.Fatalln(gopherpack.ListenAndServeHttp("tcp", "localhost:8778", server))
 }
@@ -84,14 +84,14 @@ import (
 )
 
 func main() {
-    // Main process initialization goes here
-    if gopherpack.IsMainProcess() {
-        // this is blocking call
-    	log.Fatalln(gopherpack.StartMainProcess())
-    }
+	// Main process initialization goes here
+	if gopherpack.IsMainProcess() {
+		// this is blocking call
+		log.Fatalln(gopherpack.StartMainProcess())
+	}
 
-    // Worker process initialization goes here
-    childID := "worker-" + gopherpack.GetWorkerCPUCoreNum()
+	// Worker process initialization goes here
+	childID := "worker-" + gopherpack.GetWorkerCPUCoreNum()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -104,7 +104,7 @@ func main() {
 		Handler: mux, // this can be any http.Handler, func ur mux with complex routing
 	}
 
-    // start listener as part of worker process
+	// start listener as part of worker process
 	// "tcp" and "unix" are the networks supported
 	log.Fatalln(gopherpack.ListenAndServeHttp("tcp", "localhost:8778", server))
 }
