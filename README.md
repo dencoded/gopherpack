@@ -26,7 +26,33 @@ This approach allows you to run network server as several processes listening th
 
 Also, using `SO_REUSEPORT` brings highly efficient distribution of network traffic (done by OS-kernel) over your worker processes listening on the same port. You can handle more concurrent connections.
 
-Isolating each worker on single CPU core helps scheduler to work more efficiently.
+Isolating each worker on single CPU core helps scheduler to do work more efficiently.
+
+Type of network servers
+-----------------------
+- HTTP-server, see function `ListenAndServeHttp` (with TLS support)
+- TCP-server, see function `ListenAndServeTCP` (with TLS support)
+- GRPC-server - coming soon
+
+Attaching gopherpack to your logging
+------------------------------------
+By default gopherpack will be writing logs to stdout using standard Go's logger.
+To use some custom logger you will need to set exported var `ghoperpack.Logger`. Your logger should implement this standard logger interface (like logrus does):
+```go
+type StdLogger interface {
+	Print(...interface{})
+	Printf(string, ...interface{})
+	Println(...interface{})
+
+	Fatal(...interface{})
+	Fatalf(string, ...interface{})
+	Fatalln(...interface{})
+
+	Panic(...interface{})
+	Panicf(string, ...interface{})
+	Panicln(...interface{})
+}
+```
 
 Installation
 ------------
@@ -34,11 +60,13 @@ Installation
 go get -u github.com/dencoded/gopherpack
 ```
 
-Code example
-------------
+Code examples
+-------------
 
-Integration with existing code base is pretty straightforward:
-```
+Integration with existing code base is pretty straightforward.
+
+HTTP-server example:
+```go
 package main
 
 import (
@@ -70,8 +98,8 @@ func main() {
 }
 ```
 
-Also, if you need to do some significant initialization work before start listening and you don't want to do this logic in main process:
-```
+Also, if you need to do some significant initialization work before start listening and you don't want to have this logic in main process:
+```go
 package main
 
 import (
@@ -109,10 +137,39 @@ func main() {
 	log.Fatalln(gopherpack.ListenAndServeHttp("tcp", "localhost:8778", server))
 }
 ``` 
+TCP-server example:
+```go
+package main
+
+import (
+	"io"
+	"log"
+	"net"
+
+	"github.com/dencoded/gopherpack"
+)
+
+var childID = "worker-" + gopherpack.GetWorkerCPUCoreNum()
+
+func handler(c net.Conn) {
+	c.Write([]byte("Welcome to echo-service from " + childID + ":\n"))
+	io.Copy(c, c)
+	c.Close()
+}
+
+func main() {
+	log.Fatalln(
+		gopherpack.ListenAndServeTCP(
+			"tcp",
+			"localhost:8777",
+			nil,     // pass here *tls.Config if you need TLS support
+			handler, // this is our connection handler
+		),
+	)
+}
+```
 
 NOTE:
-
-- raw TCP network servers are not supported yet (coming soon)
 - on Mac OS:
   - CPU-affinity API is not exposed so worker process gets placed on CPU core by OS
   - network load distribution over worker processes might look not very efficient

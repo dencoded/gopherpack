@@ -38,5 +38,10 @@ func getListenerWithSocketOptions(network string, address string) (net.Listener,
 		},
 	}
 
-	return listenConf.Listen(context.Background(), network, address)
+	l, err := listenConf.Listen(context.Background(), network, address)
+	if err != nil {
+		Logger.Printf("Starting listener on %s\n", l.Addr())
+	}
+
+	return l, err
 }
