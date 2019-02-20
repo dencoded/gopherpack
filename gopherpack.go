@@ -190,6 +190,28 @@ func setupWorkerRuntime() error {
 		Logger.Printf("Could not set affinity to CPU core %d: %s\n", cpuCore, err)
 		return err
 	}
+	Logger.Printf("Worker process PID=%d set affinity to CPU Core %d\n",
+		pid,
+		cpuCore,
+	)
+
+	// set maximum number of file descriptors for our child process
+	var rLimit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
+		return err
+	}
+	Logger.Printf("Worker process PID=%d current number of file descriptors: %d\n",
+		pid,
+		rLimit.Cur,
+	)
+	rLimit.Cur = rLimit.Max
+	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
+		return err
+	}
+	Logger.Printf("Worker process PID=%d current number of file descriptors set to maximum: %d\n",
+		pid,
+		rLimit.Max,
+	)
 
 	// tell runtime to use one core
 	runtime.GOMAXPROCS(1)
