@@ -1,18 +1,24 @@
 package gopherpack
 
 import (
-	"context"
 	"errors"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-// ListenAndServeHttp starts HTTP server on specified network and address.
+// GRPCServer specifies interface which gRPC server should implement to be controlled by gopherpack
+// (https://godoc.org/google.golang.org/grpc#Server implements this interface)
+type GRPCServer interface {
+	Serve(net.Listener) error
+	GracefulStop()
+}
+
+// ListenAndServeGRPC starts gRPC server on specified network and address.
 // network parameter can be "tcp" or "unix"
-// TLS is supported by passing non nil server.TLSConfig
-func ListenAndServeHttp(network string, address string, server *http.Server) error {
+// server parameter is where you pass ready to use gRPC-server (see https://godoc.org/google.golang.org/grpc#NewServer)
+func ListenAndServeGRPC(network string, address string, server GRPCServer) error {
 	// check if we are in main process
 	if isMainProcess {
 		return StartMainProcess()
@@ -57,15 +63,9 @@ func ListenAndServeHttp(network string, address string, server *http.Server) err
 			}()
 		}
 		// shutdown server gracefully
-		if err := server.Shutdown(context.Background()); err != nil {
-			Logger.Printf("Worker process PID=%d could not shutdown gracefully: %s\n", pid, err)
-		}
+		server.GracefulStop()
 	}()
 
-	if server.TLSConfig != nil {
-		Logger.Println("Using TLS")
-		return server.ServeTLS(l, "", "")
-	}
-
+	// start serving gRPC traffic
 	return server.Serve(l)
 }

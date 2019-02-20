@@ -32,7 +32,7 @@ Type of network servers
 -----------------------
 - HTTP-server, see function `ListenAndServeHttp` (with TLS support)
 - TCP-server, see function `ListenAndServeTCP` (with TLS support)
-- GRPC-server - coming soon
+- gRPC-server - see function `ListenAndServeGRPC` (with TLS support)
 
 Attaching gopherpack to your logging
 ------------------------------------
@@ -129,7 +129,7 @@ func main() {
 	// set server.TLSConfig if you want tls support
 	// and any other http.Server fields, i.e. read/write timeouts
 	server := &http.Server{
-		Handler: mux, // this can be any http.Handler, func ur mux with complex routing
+		Handler: mux, // this can be any http.Handler, func or mux with complex routing
 	}
 
 	// start listener as part of worker process
@@ -166,6 +166,46 @@ func main() {
 			handler, // this is our connection handler
 		),
 	)
+}
+```
+gRPC server example (i.e. migrating https://github.com/grpc/grpc-go/tree/master/examples/helloworld to run with `gopherpack`):
+```go
+package main
+
+import (
+        "context"
+        "log"
+
+        "google.golang.org/grpc"
+        pb "google.golang.org/grpc/examples/helloworld/helloworld"
+        "google.golang.org/grpc/reflection"
+
+        "github.com/dencoded/gopherpack"
+)
+
+const (
+        port = ":50051"
+)
+
+// server is used to implement helloworld.GreeterServer.
+type server struct{}
+
+var childID = "worker-" + gopherpack.GetWorkerCPUCoreNum()
+
+// SayHello implements helloworld.GreeterServer
+func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+        log.Printf("Received: %v", in.Name)
+        return &pb.HelloReply{Message: "Hello " + in.Name + " from " + childID}, nil
+}
+
+func main() {
+        s := grpc.NewServer()
+        pb.RegisterGreeterServer(s, &server{})
+        // Register reflection service on gRPC server.
+        reflection.Register(s)
+        if err := gopherpack.ListenAndServeGRPC("tcp", port, s); err != nil {
+                log.Fatalf("failed to serve: %v", err)
+        }
 }
 ```
 
