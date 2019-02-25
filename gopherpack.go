@@ -64,10 +64,16 @@ func StartMainProcess() error {
 	workers := make([]*os.Process, numCPU)
 	var err error
 	for i := 0; i < numCPU; i++ {
+		// these env vars will make process to start worker part
 		envVals := []string{
 			fmt.Sprintf("%s=%d", envPPID, pid),  // to tell child that it is child
-			fmt.Sprintf("%s=%d", envCPUCore, i), // to tell child on which core to settle on
+			fmt.Sprintf("%s=%d", envCPUCore, i), // to tell child on which core it was placed
 		}
+		// set affinity of main process on the fly so forked worker process will inherit it
+		if err = system.SetAffinity(i); err != nil {
+			Logger.Printf("Could not set affinity to CPU core %d: %s\n", i, err)
+		}
+		// fork main process to start worker
 		if workers[i], err = forkProcess(envVals); err != nil {
 			Logger.Printf("Could not start worker process. Error: %s\n", err)
 		} else {
@@ -181,19 +187,10 @@ func sendSignalToWorkers(workers []*os.Process, sig os.Signal) {
 }
 
 func setupWorkerRuntime() error {
-	// set affinity to the number of core passed via env
-	cpuCore, err := strconv.Atoi(workerCpuCore)
-	if err != nil {
-		return err
-	}
-	if err := system.SetAffinity(cpuCore); err != nil {
-		Logger.Printf("Could not set affinity to CPU core %d: %s\n", cpuCore, err)
-		return err
-	}
-	Logger.Printf("Worker process PID=%d set affinity to CPU Core %d\n",
-		pid,
-		cpuCore,
-	)
+	Logger.Printf("Starting worker PID=%d on CPU core %s\n", pid, workerCpuCore)
+
+	// tell runtime to use system thread
+	runtime.GOMAXPROCS(1)
 
 	// set maximum number of file descriptors for our child process
 	var rLimit syscall.Rlimit
@@ -212,11 +209,6 @@ func setupWorkerRuntime() error {
 		pid,
 		rLimit.Max,
 	)
-
-	// tell runtime to use one core
-	runtime.GOMAXPROCS(1)
-
-	Logger.Printf("Starting worker PID=%d on CPU core %d\n", pid, cpuCore)
 
 	return nil
 }

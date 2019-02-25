@@ -11,15 +11,16 @@ The `gopherpack` package provides a way to run your network server as a main pro
 Main process (aka alpha-gopher) controls worker processes (the pack members). Its responsibilities are:
 
 - start main process and listen for system signals
-- launch worker processes - one per each CPU core
+- launch worker processes - one per each CPU core, sets CPU affinity of each worker to the needed core
 - stop workers on signals `SIGINT`, `SIGTERM` or `SIGQUIT` and do exit
 - reload (aka upgrade executable) workers and itself on `SIGUSR2` signal
 - there is no any network server in main process (!)
 
 Worker process - this is where your network server lives and handles connections. Worker process does several things:
 
-- forces where its Go-routines can be scheduled via setting `GOMAXPROCS=1` and changing its affinity to one CPU core (core number is passed by main process)
+- sets its `GOMAXPROCS=1` to have only one system thread to be used
 - serves and listens network with using socket option `SO_REUSEPORT`
+- sets number of file descriptors to possible maximum via `RLIMIT_NOFILE` sys-call
 - listens for signals from main process and does graceful shutdown when main process asks to stop
 
 This approach allows you to run network server as several processes listening the same port and gives you several accept/handle connection loops instead of one.
@@ -89,7 +90,7 @@ func main() {
 	// set server.TLSConfig if you want tls support
 	// and any other http.Server fields, i.e. read/write timeouts
 	server := &http.Server{
-		Handler: mux, // this can be any http.Handler, func ur mux with complex routing
+		Handler: mux, // this can be any http.Handler, func or mux with complex routing
 	}
 
 	// start listener as part of worker process
